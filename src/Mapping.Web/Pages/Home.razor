@@ -2,125 +2,137 @@
 
 <main class="wrap">
     <header class="top">
-        <h1>Mapping assist</h1>
-        <p class="lede">Paste a source sample (XML or EDI-style segments) and describe the target. An assistant suggests which field goes where. Nothing is mapped until you approve it, and you can change the target or the conversion first.</p>
-        <p class="notice" role="note"><strong>The model here is a stand-in.</strong> It compares field names (with a short built-in word list) and checks that a value looks like a date or a number. It does not understand meaning, so expect some wrong suggestions: that is what the Approve and Reject buttons are for.</p>
+        <div class="brand">
+            <span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h6M15 18h6M9 6c5 0 1 12 6 12" /></svg></span>
+            <div>
+                <h1>Mapping assist</h1>
+                <p class="sub">An assistant suggests which field goes where. You approve each one.</p>
+            </div>
+        </div>
+        <span class="pill" title="The model is a simple stand-in">Stand-in model</span>
     </header>
 
-    <section aria-label="Examples" class="presets">
-        <span class="muted">Try an example:</span>
-        <button type="button" class="chip" @onclick="() => Load(Samples.PartnerXml, Samples.InternalOrderSchema)">Partner XML &rarr; internal XML</button>
-        <button type="button" class="chip" @onclick="() => Load(Samples.EdiOrder, Samples.InternalOrderSchema)">EDI order &rarr; internal XML</button>
-        <button type="button" class="chip" @onclick="() => Load(Samples.PartnerXml, Samples.EdiSchema)">Partner XML &rarr; EDI order</button>
-    </section>
+    <details class="about">
+        <summary>How this works, and what it can't do</summary>
+        <p>The model here is a stand-in. It compares field names (with a short built-in word list) and checks that a value looks like a date or a number. It does not understand meaning, so expect some wrong suggestions: that is what Approve and Reject are for. Only the first of a repeated element or segment is read, and nothing leaves your browser.</p>
+    </details>
 
-    <section class="inputs">
-        <div>
-            <label for="src">Source sample</label>
-            <textarea id="src" rows="14" spellcheck="false" @bind="sourceText" @bind:event="oninput"></textarea>
-            <p class="muted small">Only the first of a repeated element or segment is read.</p>
+    <section class="step" aria-labelledby="s1">
+        <h2 id="s1"><span class="n">1</span>Describe the data</h2>
+        <div class="presets" role="group" aria-label="Examples">
+            <span class="muted">Start from an example</span>
+            <button type="button" class="chip @Active(Samples.PartnerXml, Samples.InternalOrderSchema)" @onclick="() => Load(Samples.PartnerXml, Samples.InternalOrderSchema)">Partner XML &rarr; internal XML</button>
+            <button type="button" class="chip @Active(Samples.EdiOrder, Samples.InternalOrderSchema)" @onclick="() => Load(Samples.EdiOrder, Samples.InternalOrderSchema)">EDI order &rarr; internal XML</button>
+            <button type="button" class="chip @Active(Samples.PartnerXml, Samples.EdiSchema)" @onclick="() => Load(Samples.PartnerXml, Samples.EdiSchema)">Partner XML &rarr; EDI order</button>
         </div>
-        <div>
-            <label for="tgt">Target schema: <code>path | type | description</code></label>
-            <textarea id="tgt" rows="14" spellcheck="false" @bind="targetText" @bind:event="oninput"></textarea>
-            <p class="muted small">Type is string, number or date. Use /Order/Id for XML or N1.02 for an EDI element.</p>
+        <div class="inputs">
+            <div class="field">
+                <label for="src">Source sample <span class="muted">XML or EDI segments</span></label>
+                <textarea id="src" rows="12" spellcheck="false" @bind="sourceText" @bind:event="oninput"></textarea>
+            </div>
+            <div class="field">
+                <label for="tgt">Target schema <code>path | type | description</code></label>
+                <textarea id="tgt" rows="12" spellcheck="false" @bind="targetText" @bind:event="oninput"></textarea>
+            </div>
+        </div>
+        <div class="actions">
+            <button type="button" class="primary" @onclick="Suggest" disabled="@busy">@(session is null ? "Suggest mappings" : "Suggest again")</button>
+            @if (message is not null)
+            {
+                <span class="error" role="alert">@message</span>
+            }
         </div>
     </section>
-
-    <div class="actions">
-        <button type="button" class="primary" @onclick="Suggest" disabled="@busy">@(session is null ? "Suggest mappings" : "Suggest again")</button>
-        @if (message is not null)
-        {
-            <span class="error" role="alert">@message</span>
-        }
-    </div>
 
     @if (session is not null)
     {
-        <section aria-live="polite">
-            <h2>Suggestions <span class="muted small">@session.Suggestions.Count(s => s.Status == SuggestionStatus.Pending) waiting, @session.Approved.Count approved</span></h2>
-            @foreach (var s in session.Suggestions)
-            {
-                var sug = s;
-                <article class="card @sug.Status.ToString().ToLowerInvariant()">
-                    <div class="row">
-                        <code class="path">@sug.SourcePath</code>
-                        <span class="arrow" aria-hidden="true">&rarr;</span>
-                        @if (sug.Status == SuggestionStatus.Pending)
-                        {
-                            <label class="sr" for="t@(sug.Id)">Target for @sug.SourcePath</label>
-                            <select id="t@(sug.Id)" @onchange="e => targets[sug.Id] = e.Value?.ToString() ?? sug.TargetPath">
-                                @foreach (var t in session.Target)
-                                {
-                                    <option value="@t.Path" selected="@(t.Path == TargetOf(sug))">@t.Path</option>
-                                }
-                            </select>
-                            <label class="sr" for="x@(sug.Id)">Conversion</label>
-                            <select id="x@(sug.Id)" @onchange="e => transforms[sug.Id] = e.Value?.ToString() ?? sug.Transform">
-                                @foreach (var x in Transforms.Names)
-                                {
-                                    <option value="@x" selected="@(x == TransformOf(sug))">@x</option>
-                                }
-                            </select>
-                        }
-                        else
-                        {
-                            <code class="path">@sug.TargetPath</code>
-                            <span class="tag">@sug.Transform</span>
-                        }
-                    </div>
-                    <div class="row meta">
-                        <span class="conf" title="Confidence">@((sug.Confidence * 100).ToString("0"))%</span>
-                        <span class="muted">@sug.Rationale</span>
-                    </div>
-                    <div class="row buttons">
-                        @if (sug.Status == SuggestionStatus.Pending)
-                        {
-                            <button type="button" class="ok" @onclick="() => Approve(sug)">Approve</button>
-                            <button type="button" @onclick="() => Reject(sug)">Reject</button>
-                        }
-                        else
-                        {
-                            <span class="status">@sug.Status</span>
-                            @if (sug.Status == SuggestionStatus.Approved)
-                            {
-                                <button type="button" @onclick="() => Withdraw(sug)">Withdraw</button>
-                            }
-                        }
-                    </div>
-                </article>
-            }
-            @if (session.Suggestions.Count == 0)
-            {
-                <p class="muted">No suggestions.</p>
-            }
-
-            @if (session.UnmappedTargets.Count > 0)
-            {
-                <p class="muted small">Not mapped yet: @string.Join(", ", session.UnmappedTargets.Select(t => t.Path))</p>
-            }
-        </section>
-
-        <section aria-live="polite">
-            <h2>Output from approved mappings</h2>
-            @if (result is null || result.Values.Count == 0)
-            {
-                <p class="muted">Approve a suggestion to see the output.</p>
-            }
-            else
-            {
-                <pre class="out">@result.Output.Text</pre>
-                @foreach (var w in result.Output.Warnings.Concat(result.Skipped))
+        <div class="cols">
+            <section class="step" aria-labelledby="s2" aria-live="polite">
+                <h2 id="s2"><span class="n">2</span>Review suggestions <span class="count">@session.Suggestions.Count(s => s.Status == SuggestionStatus.Pending) waiting &middot; @session.Approved.Count approved</span></h2>
+                @foreach (var s in session.Suggestions)
                 {
-                    <p class="muted small">@w</p>
+                    var sug = s;
+                    <article class="card @sug.Status.ToString().ToLowerInvariant()">
+                        <div class="row">
+                            <code class="path">@sug.SourcePath</code>
+                            <span class="arrow" aria-hidden="true">&rarr;</span>
+                            @if (sug.Status == SuggestionStatus.Pending)
+                            {
+                                <label class="sr" for="t@(sug.Id)">Target for @sug.SourcePath</label>
+                                <select id="t@(sug.Id)" @onchange="e => targets[sug.Id] = e.Value?.ToString() ?? sug.TargetPath">
+                                    @foreach (var t in session.Target)
+                                    {
+                                        <option value="@t.Path" selected="@(t.Path == TargetOf(sug))">@t.Path</option>
+                                    }
+                                </select>
+                                <label class="sr" for="x@(sug.Id)">Conversion</label>
+                                <select id="x@(sug.Id)" class="short" @onchange="e => transforms[sug.Id] = e.Value?.ToString() ?? sug.Transform">
+                                    @foreach (var x in Transforms.Names)
+                                    {
+                                        <option value="@x" selected="@(x == TransformOf(sug))">@x</option>
+                                    }
+                                </select>
+                            }
+                            else
+                            {
+                                <code class="path to">@sug.TargetPath</code>
+                                <span class="tag">@sug.Transform</span>
+                            }
+                        </div>
+                        <div class="meta">
+                            <span class="meter" role="img" aria-label="Confidence @((sug.Confidence * 100).ToString("0")) percent"><i style="width:@((sug.Confidence * 100).ToString("0"))%"></i></span>
+                            <span class="conf">@((sug.Confidence * 100).ToString("0"))%</span>
+                            <span class="why">@sug.Rationale</span>
+                        </div>
+                        <div class="buttons">
+                            @if (sug.Status == SuggestionStatus.Pending)
+                            {
+                                <button type="button" class="ok" @onclick="() => Approve(sug)">Approve</button>
+                                <button type="button" @onclick="() => Reject(sug)">Reject</button>
+                            }
+                            else
+                            {
+                                <span class="status @sug.Status.ToString().ToLowerInvariant()">@sug.Status</span>
+                                @if (sug.Status == SuggestionStatus.Approved)
+                                {
+                                    <button type="button" @onclick="() => Withdraw(sug)">Withdraw</button>
+                                }
+                            }
+                        </div>
+                    </article>
                 }
-            }
-        </section>
+                @if (session.Suggestions.Count == 0)
+                {
+                    <p class="muted">No suggestions.</p>
+                }
+
+                @if (session.UnmappedTargets.Count > 0)
+                {
+                    <p class="muted small">Not mapped yet: <span class="mono">@string.Join(", ", session.UnmappedTargets.Select(t => t.Path))</span></p>
+                }
+            </section>
+
+            <section class="step out-col" aria-labelledby="s3" aria-live="polite">
+                <h2 id="s3"><span class="n">3</span>Output</h2>
+                @if (result is null || result.Values.Count == 0)
+                {
+                    <p class="empty">Approve a suggestion and the document builds here, from approved mappings only.</p>
+                }
+                else
+                {
+                    <pre class="out">@result.Output.Text</pre>
+                    @foreach (var w in result.Output.Warnings.Concat(result.Skipped))
+                    {
+                        <p class="muted small">@w</p>
+                    }
+                }
+            </section>
+        </div>
     }
 
     <footer class="foot">
-        <a href="https://github.com/hamzamehmood46/mapping-assist-dotnet">Source on GitHub</a>
-        <span class="muted"> / The data is made up and nothing leaves your browser.</span>
+        <a href="https://github.com/hamzamehmood46/mapping-assist-dotnet" target="_blank" rel="noopener">Source on GitHub</a>
+        <span class="muted"> &middot; The data is made up and nothing leaves your browser.</span>
     </footer>
 </main>
 
@@ -139,6 +151,8 @@
     private string TargetOf(Suggestion s) => targets.GetValueOrDefault(s.Id, s.TargetPath);
 
     private string TransformOf(Suggestion s) => transforms.GetValueOrDefault(s.Id, s.Transform);
+
+    private string Active(string source, string target) => sourceText == source && targetText == target ? "on" : "";
 
     private void Load(string source, string target)
     {
