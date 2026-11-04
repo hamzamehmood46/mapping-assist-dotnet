@@ -19,7 +19,7 @@
 
 * { box-sizing: border-box; }
 
-html, body { margin: 0; }
+html, body { margin: 0; overflow-x: hidden; }
 
 body {
   background:
@@ -82,7 +82,7 @@ button { font: inherit; color: var(--txt); }
 .out-col { position: sticky; top: 16px; }
 @media (max-width: 900px) { .out-col { position: static; } }
 
-.card { margin-bottom: 10px; padding: 13px 15px; background: var(--card); border: 1px solid var(--line); border-left: 3px solid var(--warm); border-radius: 14px; animation: rise 0.22s ease-out both; }
+.card { min-width: 0; margin-bottom: 10px; padding: 13px 15px; background: var(--card); border: 1px solid var(--line); border-left: 3px solid var(--warm); border-radius: 14px; animation: rise 0.22s ease-out both; }
 .card.approved { border-left-color: var(--ac2); }
 .card.rejected { border-left-color: var(--line2); opacity: 0.6; }
 .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
