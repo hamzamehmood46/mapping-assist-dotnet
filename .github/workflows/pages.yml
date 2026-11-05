@@ -8,8 +8,6 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: pages
@@ -25,13 +23,13 @@ jobs:
           dotnet-version: 8.0.x
       - run: dotnet test Mapping.sln -c Release
 
+  # Pages serves the gh-pages branch, so the build is committed there instead of using deploy-pages.
   deploy:
     needs: test
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -44,9 +42,12 @@ jobs:
           sed -i 's|<base href="/" />|<base href="/mapping-assist-dotnet/" />|' out/wwwroot/index.html
           touch out/wwwroot/.nojekyll
           cp out/wwwroot/index.html out/wwwroot/404.html
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: out/wwwroot
-      - id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Push the build to gh-pages
+        working-directory: out/wwwroot
+        run: |
+          git init -q -b gh-pages
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Publish the Blazor build for GitHub Pages"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" gh-pages
